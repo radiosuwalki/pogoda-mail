@@ -24,6 +24,7 @@ def get_forecast():
     }
 
     data = requests.get(url, params=params).json()
+    print(data)
     return data["list"]
 
 
