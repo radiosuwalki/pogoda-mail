@@ -24,24 +24,27 @@ def get_forecast():
     }
 
     data = requests.get(url, params=params).json()
-    print(data)
+
+    if "list" not in data:
+        raise Exception(f"Błąd API: {data}")
+
     return data["list"]
 
 
 def build_report(forecast):
     temps = []
-    rain_hours = []
+    rain_times = []
     weather_count = {}
 
-    for item in forecast[:8]:  # ~24h (3h interval)
+    for item in forecast[:8]:
         temp = item["main"]["temp"]
         temps.append(temp)
 
         weather = item["weather"][0]["main"].lower()
         weather_count[weather] = weather_count.get(weather, 0) + 1
 
-        if "rain" in item or "Rain" in item.get("weather", [{}])[0]["main"]:
-            rain_hours.append(item["dt_txt"])
+        if "rain" in item.get("weather", [{}])[0]["main"].lower():
+            rain_times.append(item["dt_txt"])
 
     t_min = min(temps)
     t_max = max(temps)
@@ -60,28 +63,25 @@ def build_report(forecast):
         category = "🌤 Zmienna pogoda"
 
     rain_text = ""
-    if rain_hours:
-        rain_text = "\nOpady możliwe około:\n" + "\n".join(rain_hours)
+    if rain_times:
+        rain_text = "\nOpady:\n" + "\n".join(rain_times)
 
     return f"""
 🌤 Pogoda na dziś - {CITY}
 
-📊 Temperatura:
-- Min: {t_min:.1f}°C
-- Max: {t_max:.1f}°C
+🌡 Min: {t_min:.1f}°C
+🌡 Max: {t_max:.1f}°C
 
-📌 Typ dnia: {category}
+📌 Dzień: {category}
+📊 Opis: {dominant}
 
-🌦 Opis: {dominant}
 {rain_text}
-
-Miłego dnia!
 """
 
 
 def send_email(body):
     msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = f"Pogoda na dziś - {CITY}"
+    msg["Subject"] = f"Pogoda - {CITY}"
     msg["From"] = SMTP_USER
     msg["To"] = RECIPIENTS
 
@@ -96,7 +96,7 @@ def main():
     forecast = get_forecast()
     report = build_report(forecast)
     send_email(report)
-    print("OK - wysłano pogodę dnia")
+    print("OK")
 
 
 if __name__ == "__main__":
