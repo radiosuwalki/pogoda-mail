@@ -16,66 +16,53 @@ RECIPIENTS = os.getenv("RECIPIENTS")
 
 def get_forecast():
     url = "https://api.openweathermap.org/data/2.5/forecast"
-    params = {
+
+    r = requests.get(url, params={
         "q": CITY,
         "appid": API_KEY,
         "units": "metric",
         "lang": "pl"
-    }
+    })
 
-    data = requests.get(url, params=params).json()
+    data = r.json()
 
     if "list" not in data:
-        raise Exception(f"Błąd API: {data}")
+        raise Exception(data)
 
     return data["list"]
 
 
 def build_report(forecast):
     temps = []
-    rain_times = []
     weather_count = {}
 
     for item in forecast[:8]:
-        temp = item["main"]["temp"]
-        temps.append(temp)
+        temps.append(item["main"]["temp"])
+        w = item["weather"][0]["main"].lower()
+        weather_count[w] = weather_count.get(w, 0) + 1
 
-        weather = item["weather"][0]["main"].lower()
-        weather_count[weather] = weather_count.get(weather, 0) + 1
+    tmin = min(temps)
+    tmax = max(temps)
 
-        if "rain" in item.get("weather", [{}])[0]["main"].lower():
-            rain_times.append(item["dt_txt"])
+    main_weather = max(weather_count, key=weather_count.get)
 
-    t_min = min(temps)
-    t_max = max(temps)
-
-    dominant = max(weather_count, key=weather_count.get)
-
-    if "thunderstorm" in weather_count:
-        category = "⛈ Burza"
-    elif "rain" in weather_count:
-        category = "🌧 Deszcz"
+    if "rain" in weather_count:
+        icon = "🌧 Deszcz"
+    elif "thunderstorm" in weather_count:
+        icon = "⛈ Burza"
     elif "clouds" in weather_count:
-        category = "☁️ Zachmurzenie"
-    elif "clear" in weather_count:
-        category = "☀️ Słoneczne"
+        icon = "☁️ Zachmurzenie"
     else:
-        category = "🌤 Zmienna pogoda"
-
-    rain_text = ""
-    if rain_times:
-        rain_text = "\nOpady:\n" + "\n".join(rain_times)
+        icon = "☀️ Słonecznie"
 
     return f"""
 🌤 Pogoda na dziś - {CITY}
 
-🌡 Min: {t_min:.1f}°C
-🌡 Max: {t_max:.1f}°C
+🌡 Min: {tmin:.1f}°C
+🌡 Max: {tmax:.1f}°C
 
-📌 Dzień: {category}
-📊 Opis: {dominant}
-
-{rain_text}
+📌 Warunki: {icon}
+📊 Opis: {main_weather}
 """
 
 
