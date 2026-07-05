@@ -2,7 +2,7 @@ name: Pogoda Mail
 
 on:
   schedule:
-    - cron: "0 22 * * *"
+    - cron: "0 22 * * *"  # 00:00 Polska
   workflow_dispatch:
 
 jobs:
@@ -10,13 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
       SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASS: ${{ secrets.SMTP_PASS }}
       RECIPIENTS: ${{ secrets.RECIPIENTS }}
-      CITY: ${{ secrets.CITY }}
 
     steps:
       - uses: actions/checkout@v4
