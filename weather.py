@@ -1,74 +1,83 @@
-import os
 import requests
 import smtplib
 import ssl
 from email.mime.text import MIMEText
+import os
 
-CITY = os.getenv("CITY", "Gdańsk")
-API_KEY = os.getenv("WEATHER_API_KEY")
-
+# ===== SMTP =====
 SMTP_SERVER = os.getenv("SMTP_SERVER")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
 RECIPIENTS = os.getenv("RECIPIENTS")
 
-
-def get_forecast():
-    url = "https://api.openweathermap.org/data/2.5/forecast"
-
-    r = requests.get(url, params={
-        "q": CITY,
-        "appid": API_KEY,
-        "units": "metric",
-        "lang": "pl"
-    })
-
-    data = r.json()
-
-    if "list" not in data:
-        raise Exception(data)
-
-    return data["list"]
+# ===== SUWAŁKI =====
+CITY = "Suwałki"
+LAT = 54.102
+LON = 22.930
 
 
-def build_report(forecast):
-    temps = []
-    weather_count = {}
+def get_weather():
+    url = "https://api.open-meteo.com/v1/forecast"
 
-    for item in forecast[:8]:
-        temps.append(item["main"]["temp"])
-        w = item["weather"][0]["main"].lower()
-        weather_count[w] = weather_count.get(w, 0) + 1
+    params = {
+        "latitude": LAT,
+        "longitude": LON,
+        "hourly": "temperature_2m,precipitation",
+        "forecast_days": 1,
+        "timezone": "Europe/Warsaw"
+    }
+
+    data = requests.get(url, params=params).json()
+    return data["hourly"]
+
+
+def build_report(data):
+    temps = data["temperature_2m"][:24]
+    rain = data["precipitation"][:24]
+    times = data["time"][:24]
 
     tmin = min(temps)
     tmax = max(temps)
 
-    main_weather = max(weather_count, key=weather_count.get)
+    rain_hours = []
 
-    if "rain" in weather_count:
-        icon = "🌧 Deszcz"
-    elif "thunderstorm" in weather_count:
-        icon = "⛈ Burza"
-    elif "clouds" in weather_count:
-        icon = "☁️ Zachmurzenie"
+    for i, r in enumerate(rain):
+        if r > 0:
+            rain_hours.append(times[i][11:16])  # HH:MM
+
+    if rain_hours:
+        rain_text = "🌧 Opady możliwe około: " + ", ".join(rain_hours)
     else:
-        icon = "☀️ Słonecznie"
+        rain_text = "☀️ Brak opadów w ciągu dnia"
+
+    # prosta klasyfikacja dnia
+    if tmax <= 0:
+        day_type = "❄️ Mroźnie"
+    elif tmax < 10:
+        day_type = "🧥 Chłodno"
+    elif tmax < 20:
+        day_type = "🌤 Łagodnie"
+    else:
+        day_type = "☀️ Ciepło"
 
     return f"""
-🌤 Pogoda na dziś - {CITY}
+🌤 Pogoda na dziś – {CITY}
 
 🌡 Min: {tmin:.1f}°C
 🌡 Max: {tmax:.1f}°C
 
-📌 Warunki: {icon}
-📊 Opis: {main_weather}
+📌 Typ dnia: {day_type}
+
+📍 {rain_text}
+
+Miłego dnia!
 """
 
 
 def send_email(body):
     msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = f"Pogoda - {CITY}"
+    msg["Subject"] = f"Pogoda – {CITY}"
     msg["From"] = SMTP_USER
     msg["To"] = RECIPIENTS
 
@@ -80,10 +89,10 @@ def send_email(body):
 
 
 def main():
-    forecast = get_forecast()
-    report = build_report(forecast)
+    data = get_weather()
+    report = build_report(data)
     send_email(report)
-    print("OK")
+    print("OK - wysłano pogodę")
 
 
 if __name__ == "__main__":
