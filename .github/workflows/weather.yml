@@ -2,7 +2,7 @@ name: Pogoda Mail
 
 on:
   schedule:
-    - cron: "0 22 * * *"  # 00:00 Polska
+    - cron: "0 22 * * *"
   workflow_dispatch:
 
 jobs:
